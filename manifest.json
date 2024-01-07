@@ -1,0 +1,38 @@
+{
+  "name": "Wakapippi Vocal Remover Extension",
+  "description": "A realtime vocal remover using ML models.",
+  "version": "0.1",
+  "manifest_version": 3,
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content_script.js"
+      ],
+      "resources": [
+        "models/*",
+        "sandbox.html"
+      ]
+    }
+  ],
+  "permissions": [
+    "offscreen"
+  ],
+  "content_security_policy": {
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval';"
+  },
+  "sandbox": {
+    "pages": [
+      "sandbox.html"
+    ]
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  }
+}
