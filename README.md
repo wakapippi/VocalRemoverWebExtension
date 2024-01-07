@@ -24,6 +24,14 @@ ContentScript側で、createScriptProcessorを使用しているが、このAPI�
 ## 今後の展望
 今後は、前述の問題の解決に加えて、ボーカルと伴奏の割合を自由に調整できるようにする機能などの実装を考えている。
 
+## 使い方
+このリポジトリは基本的に開発者向けであるが、利用者の方がダウンロードしてブラウザで使いたい場合は、以下の手順で導入する。
+- 緑の「Code」ボタンから「Download ZIP」を選択し、解凍する
+- Chromeで、 chrome://extensions/ にアクセスする
+- 右上の デベロッパー モード をオンにする
+- パッケージ化されていない拡張機能を読み込む をクリックする
+- 解凍した後のフォルダを選択する
+
 ## Credits
 ### Anjok07, Aufr33
 モデルは、[MITライセンス](https://github.com/Anjok07/ultimatevocalremovergui/blob/v5.2.0/LICENSE)に基づき、[Ultimate Vocal Remover](https://github.com/Anjok07/ultimatevocalremovergui)の「UVR-MDX-NET-Inst_HQ_3」を使用しています。
