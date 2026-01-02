@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2023 Google LLC. All Rights Reserved.
+ * Copyright 2024 Google LLC. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -2112,9 +2112,9 @@
 
     if (isWebGPUSupported()) {
         tf.registerBackend('webgpu', function () { return __awaiter(void 0, void 0, void 0, function () {
-            var gpuDescriptor, adapter, deviceDescriptor, requiredFeatures, adapterLimits, device, adapterInfo;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
+            var gpuDescriptor, adapter, deviceDescriptor, requiredFeatures, adapterLimits, device, adapterInfo, _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
                     case 0:
                         gpuDescriptor = {
                             powerPreference: tf.env().get('WEBGPU_USE_LOW_POWER_GPU') ?
@@ -2123,7 +2123,7 @@
                         };
                         return [4 /*yield*/, navigator.gpu.requestAdapter(gpuDescriptor)];
                     case 1:
-                        adapter = _a.sent();
+                        adapter = _c.sent();
                         deviceDescriptor = {};
                         requiredFeatures = [];
                         if (adapter.features.has('timestamp-query')) {
@@ -2145,10 +2145,24 @@
                         };
                         return [4 /*yield*/, adapter.requestDevice(deviceDescriptor)];
                     case 2:
-                        device = _a.sent();
-                        return [4 /*yield*/, adapter.requestAdapterInfo()];
+                        device = _c.sent();
+                        if (!('info' in adapter)) return [3 /*break*/, 3];
+                        _a = adapter.info;
+                        return [3 /*break*/, 7];
                     case 3:
-                        adapterInfo = _a.sent();
+                        if (!('requestAdapterInfo' in adapter)) return [3 /*break*/, 5];
+                        return [4 /*yield*/, adapter.requestAdapterInfo()];
+                    case 4:
+                        _b = _c.sent();
+                        return [3 /*break*/, 6];
+                    case 5:
+                        _b = undefined;
+                        _c.label = 6;
+                    case 6:
+                        _a = _b;
+                        _c.label = 7;
+                    case 7:
+                        adapterInfo = _a;
                         return [2 /*return*/, new WebGPUBackend(device, adapterInfo)];
                 }
             });

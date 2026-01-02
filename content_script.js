@@ -8,15 +8,13 @@ let bufferQueue = [];
 let stopped = false;
 
 chrome.runtime.onMessage.addListener((mes, _ev, sendResponse) => {
-
     if (mes.type == "stop") {
         stopped = true;
+        if (workletNode) workletNode.port.postMessage({ type: "set_stop", value: true });
         sendResponse();
     }
     else if (mes.type == "start") {
-
-        stopped = false;
-
+        stopped = false;        
         let video = document.querySelector("video");
         startHookVideo(video);
 
@@ -33,15 +31,40 @@ chrome.runtime.onMessage.addListener((mes, _ev, sendResponse) => {
             sendResponse(bufferQueue.shift());
         }
     } else if (mes.type == "buffer") {
-
-        bufferL = bufferL.concat(mes.payload[0]);
-        bufferR = bufferR.concat(mes.payload[1]);
+       if (workletNode) {
+            workletNode.port.postMessage({
+                type: "processed_buffer",
+                payload: mes.payload
+            });
+        }
         sendResponse();
     }
-    // ポップアップにメッセージを返す
-
 });
 
+
+let workletNode;
+
+async function startHookVideo(target) {
+    await audioContext.resume();
+    await audioContext.audioWorklet.addModule(chrome.runtime.getURL("vocal-remover-processor.js"));
+
+    let source = audioContext.createMediaElementSource(target);
+
+    workletNode = new AudioWorkletNode(audioContext, "vocal-remover-processor");
+
+    workletNode.port.onmessage = (event) => {
+        if (event.data.type === "input_data") {
+            // 元のコードの bufferQueue.push に相当
+            bufferQueue.push(event.data.payload);
+        }
+    };
+
+    source.connect(workletNode);
+    workletNode.connect(audioContext.destination);
+}
+
+
+/*
 
 async function startHookVideo(target) {
 
@@ -114,3 +137,4 @@ function processAudio(audioProcessingEvent) {
         }
     }
 }
+*/
