@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 640px;
+            height: 400px;
+            overflow: hidden;
+            background:
+                radial-gradient(700px 420px at 88% -12%, rgba(124, 92, 255, .38), transparent 65%),
+                radial-gradient(600px 380px at -8% 112%, rgba(79, 140, 255, .30), transparent 65%),
+                #101218;
+            font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+            color: #e8eaf2;
+            display: flex;
+            align-items: center;
+            padding: 0 34px;
+            gap: 24px;
+        }
+
+        .copy {
+            flex: 1;
+        }
+
+        h1 {
+            font-size: 13px;
+            letter-spacing: .14em;
+            color: #9aa0b4;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        .tagline {
+            font-size: 27px;
+            font-weight: 800;
+            line-height: 1.45;
+            margin-bottom: 20px;
+        }
+
+        .tagline span {
+            background: linear-gradient(135deg, #9d7bff, #4f8cff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        ul {
+            list-style: none;
+            font-size: 12.5px;
+            color: #b9bfd2;
+            line-height: 2.1;
+        }
+
+        li::before {
+            content: "♪ ";
+            color: #7c5cff;
+        }
+
+        .card {
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .55), 0 0 0 1px #2b2f40;
+            width: 276px;
+            height: 344px;
+            flex: none;
+        }
+
+        iframe {
+            width: 332px;
+            height: 414px;
+            border: 0;
+            display: block;
+            background: #14161f;
+            transform: scale(0.83);
+            transform-origin: top left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="copy">
+        <h1>VOCAL REMOVER</h1>
+        <div class="tagline">ワンクリックで、<br>どんなWeb動画も<br><span>カラオケ</span>に。</div>
+        <ul>
+            <li>AIがリアルタイムにボーカルを分離</li>
+            <li>ボーカルと伴奏を自由にミックス</li>
+            <li>すべてブラウザ内で高速処理</li>
+        </ul>
+    </div>
+    <div class="card"><iframe src="_popup_preview.html"></iframe></div>
+</body>
+
+</html>
