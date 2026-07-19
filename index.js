@@ -8,7 +8,7 @@ let running = false;
 function renderState() {
     document.body.classList.toggle("running", running);
     statusText.textContent = running ? "動作中" : "停止中";
-    toggleButton.innerHTML = running ? "■&nbsp; 停止" : "▶&nbsp; 実行";
+    toggleButton.textContent = running ? "■  停止" : "▶  実行";
 }
 
 function showError(text) {

@@ -1,0 +1,51 @@
+{
+  "name": "Wakapippi Vocal Remover Extension",
+  "description": "AIが再生中のWeb動画からリアルタイムでボーカルを除去。ボーカルと伴奏のミックスも自由自在。すべてブラウザ内で処理されます。",
+  "version": "1.0",
+  "manifest_version": 3,
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "vocal-remover@wakapippi",
+      "strict_min_version": "141.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content_script.js"
+      ]
+    }
+  ],
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "page": "background.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "vocal-remover-processor.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
