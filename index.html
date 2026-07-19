@@ -18,6 +18,14 @@
     </div><br>
     <input type="button" id="execute" value="実行"></input>
     <input type="button" id="stop" value="停止"></input>
+    <div style="margin-top: 12px;">
+        <label for="vocal-ratio">ボーカル音量: <span id="vocal-ratio-value">0</span>%</label><br>
+        <input type="range" id="vocal-ratio" min="0" max="100" step="1" value="0" style="width: 100%;">
+    </div>
+    <div style="margin-top: 8px;">
+        <label for="inst-ratio">伴奏音量: <span id="inst-ratio-value">100</span>%</label><br>
+        <input type="range" id="inst-ratio" min="0" max="100" step="1" value="100" style="width: 100%;">
+    </div>
     <script src="index.js"></script>
 </body>
 

@@ -1,19 +1,51 @@
+const INPUT_BATCH_SIZE = 2048;   // 入力をまとめて送るサンプル数 (約46ms @ 44.1kHz)
+const MAX_QUEUE_SIZE = 44100;    // 処理済みバッファの上限 (約1秒)
+
 class VocalRemoverProcessor extends AudioWorkletProcessor {
     constructor() {
         super();
-        this.bufferL = [];
-        this.bufferR = [];
         this.stopped = false;
 
-        // メインスレッドからのメッセージ（加工済み音声）を受け取る
+        // 入力バッチ (メインスレッドへの送信頻度を約3ms間隔→約46ms間隔に下げる)
+        this.batchL = new Float32Array(INPUT_BATCH_SIZE);
+        this.batchR = new Float32Array(INPUT_BATCH_SIZE);
+        this.batchFill = 0;
+
+        // 処理済み音声のチャンクキュー (spread/spliceによる全体コピーを避ける)
+        this.chunks = [];
+        this.chunkOffset = 0; // 先頭チャンクの読み出し位置
+        this.queued = 0;      // キュー内の残りサンプル数
+
         this.port.onmessage = (event) => {
             if (event.data.type === "processed_buffer") {
-                this.bufferL.push(...event.data.payload[0]);
-                this.bufferR.push(...event.data.payload[1]);
+                this.chunks.push(event.data.payload);
+                this.queued += event.data.payload[0].length;
+                this.trimQueue();
             } else if (event.data.type === "set_stop") {
                 this.stopped = event.data.value;
+                if (!this.stopped) {
+                    // 再開時は古い処理済み音声を破棄
+                    this.chunks = [];
+                    this.chunkOffset = 0;
+                    this.queued = 0;
+                }
             }
         };
+    }
+
+    // 溜まりすぎたバッファを古い方から破棄
+    trimQueue() {
+        while (this.queued > MAX_QUEUE_SIZE && this.chunks.length > 0) {
+            const first = this.chunks[0];
+            const available = first[0].length - this.chunkOffset;
+            const drop = Math.min(available, this.queued - MAX_QUEUE_SIZE);
+            this.chunkOffset += drop;
+            this.queued -= drop;
+            if (this.chunkOffset >= first[0].length) {
+                this.chunks.shift();
+                this.chunkOffset = 0;
+            }
+        }
     }
 
     process(inputs, outputs, parameters) {
@@ -25,41 +57,40 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
         const inputL = input[0];
         const inputR = input[1] || input[0]; // モノラルの場合は左をコピー
 
-        // 1. 入力音声をメインスレッドへ送信（AI処理用）
-        this.port.postMessage({
-            type: "input_data",
-            payload: [Array.from(inputL), Array.from(inputR)]
-        });
+        // 1. 入力をバッチに蓄積し、満杯になったらTransferableでゼロコピー送信
+        this.batchL.set(inputL, this.batchFill);
+        this.batchR.set(inputR, this.batchFill);
+        this.batchFill += inputL.length;
+        if (this.batchFill >= INPUT_BATCH_SIZE) {
+            const l = this.batchL;
+            const r = this.batchR;
+            this.port.postMessage({ type: "input_data", payload: [l, r] }, [l.buffer, r.buffer]);
+            this.batchL = new Float32Array(INPUT_BATCH_SIZE);
+            this.batchR = new Float32Array(INPUT_BATCH_SIZE);
+            this.batchFill = 0;
+        }
 
         // 2. 出力バッファへの書き込み
-        for (let channel = 0; channel < output.length; channel++) {
-            const outputData = output[channel];
-            const target = (channel === 0) ? this.bufferL : this.bufferR;
-
-            if (this.stopped) {
-                // 停止時は入力をそのままスルー
-                outputData.set(input[channel] || input[0]);
-                continue;
+        const frameSize = output[0].length;
+        if (this.stopped || this.queued < frameSize) {
+            // 停止中・バッファ不足時は入力をそのままスルー
+            for (let channel = 0; channel < output.length; channel++) {
+                output[channel].set(input[channel] || input[0]);
             }
-
-            if (target.length >= outputData.length) {
-                // 加工済みバッファから取り出してセット
-                for (let i = 0; i < outputData.length; i++) {
-                    outputData[i] = target[i];
-                }
-                // 使用した分を削除
-                target.splice(0, outputData.length);
-            } else {
-                // バッファ不足時は無音、または元の音を流す（アンダーフロー対策）
-                outputData.set(input[channel] || input[0]);
-            }
+            return true;
         }
 
-        // メモリ消費抑制のため、溜まりすぎたバッファを制限（必要に応じて）
-        if (this.bufferL.length > 44100) {
-            this.bufferL.splice(0, this.bufferL.length - 44100);
-            this.bufferR.splice(0, this.bufferR.length - 44100);
+        for (let i = 0; i < frameSize; i++) {
+            const first = this.chunks[0];
+            output[0][i] = first[0][this.chunkOffset];
+            if (output[1]) output[1][i] = first[1][this.chunkOffset];
+            this.chunkOffset++;
+            if (this.chunkOffset >= first[0].length) {
+                this.chunks.shift();
+                this.chunkOffset = 0;
+            }
         }
+        this.queued -= frameSize;
 
         return true;
     }

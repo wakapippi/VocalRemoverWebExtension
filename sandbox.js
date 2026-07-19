@@ -1,26 +1,54 @@
-let buffer0 = [];
-let buffer1 = [];
+const SEGMENT_SIZE = 31744;   // AI処理に必要なサンプル数 (32フレーム分)
+const PAD_SIZE = 3072;        // 境界ノイズ対策の前後ゼロパディング
+const INPUT_SIZE = SEGMENT_SIZE + PAD_SIZE * 2;
+const MIN_NEW_SAMPLES = 3072; // 新規サンプルがこれ未満のうちは推論を見送る (約70ms)
+const SILENCE_THRESHOLD = 1e-6; // これ以下の振幅しかなければ無音とみなす (約-120dB)
 
-let totalBufferPointer = 0;
+// 直近SEGMENT_SIZEサンプルだけを保持するスライディングウィンドウ
+// (concat/spliceによる巨大配列の作り直しを避ける)
+let window0 = new Float32Array(SEGMENT_SIZE);
+let window1 = new Float32Array(SEGMENT_SIZE);
+let filled = 0;         // ウィンドウ内の有効サンプル数
+let totalReceived = 0;  // 累計受信サンプル数
+let writtenPointer = 0; // 出力済みサンプル位置
 
-let writtenPointer = 0;
-
-let writeBuffer0 = [];
-let writeBuffer1 = [];
 let source;
 let origin;
+let vocalRatio = 0;   // ボーカルのミックス割合 (%)
+let instRatio = 100;  // 伴奏のミックス割合 (%)
 
-window.addEventListener("message", async (event) => {
+window.addEventListener("message", (event) => {
 
     if (event.data.type == "buffer") {
-        let signal = event.data.payload;
-        buffer0 = buffer0.concat(signal[0]);
-        buffer1 = buffer1.concat(signal[1]);
-        totalBufferPointer += signal[0].length;
+        appendToWindow(event.data.payload[0], event.data.payload[1]);
+        if (event.data.mixRatio != null) {
+            vocalRatio = event.data.mixRatio.vocal;
+            instRatio = event.data.mixRatio.inst;
+        }
         source = event.source;
         origin = event.origin;
     }
 });
+
+function appendToWindow(chunk0, chunk1) {
+    const n = chunk0.length;
+    if (n >= SEGMENT_SIZE) {
+        window0.set(chunk0.subarray(n - SEGMENT_SIZE));
+        window1.set(chunk1.subarray(n - SEGMENT_SIZE));
+        filled = SEGMENT_SIZE;
+    } else {
+        const overflow = filled + n - SEGMENT_SIZE;
+        if (overflow > 0) {
+            window0.copyWithin(0, overflow, filled);
+            window1.copyWithin(0, overflow, filled);
+            filled -= overflow;
+        }
+        window0.set(chunk0, filled);
+        window1.set(chunk1, filled);
+        filled += n;
+    }
+    totalReceived += n;
+}
 
 
 (async function () {
@@ -30,11 +58,9 @@ window.addEventListener("message", async (event) => {
     window.model = await tf.loadGraphModel("./models/model.json");
 
     while (true) {
-        await runModel();
-        if (source) {
-            source.postMessage([writeBuffer0, writeBuffer1], origin);
-            writeBuffer0 = [];
-            writeBuffer1 = [];
+        const result = await runModel();
+        if (result && source) {
+            source.postMessage(result, origin);
         }
     }
 })();
@@ -50,29 +76,29 @@ async function waitMs(ms) {
  * 推論メイン処理
  */
 async function runModel() {
-    tf.engine().startScope();
-
-    // AI処理に必要なサンプル数(31744)に達するまで待機
-    if (buffer0.length < 31744) {
+    // ウィンドウが埋まるまで、また新規サンプルが十分溜まるまで待機
+    const currentLast = totalReceived;
+    const elapse = currentLast - writtenPointer;
+    if (filled < SEGMENT_SIZE || elapse < MIN_NEW_SAMPLES || !window.model) {
         await waitMs(10);
-        tf.engine().endScope();
-        return;
+        return null;
     }
 
-    let currentLast = totalBufferPointer;
+    const take = Math.min(elapse, SEGMENT_SIZE);
 
-    // 最新のセグメントを切り出し
-    let originalLeft = buffer0.slice(buffer0.length - 31744, buffer0.length);
-    let originalRight = buffer1.slice(buffer1.length - 31744, buffer1.length);
+    // 無音区間 (一時停止中など) は推論をスキップしてGPU負荷を抑え、無音をそのまま返す
+    if (isSilent(window0) && isSilent(window1)) {
+        writtenPointer = currentLast;
+        return [new Float32Array(take), new Float32Array(take)];
+    }
 
-    // 前後のパディング (境界ノイズ対策)
-    let padSize = 3072;
-    let left = new Array(padSize).fill(0).concat(originalLeft).concat(new Array(padSize).fill(0));
-    let right = new Array(padSize).fill(0).concat(originalRight).concat(new Array(padSize).fill(0));
+    tf.engine().startScope();
 
-    // 入力バッファの整理
-    buffer0.splice(0, buffer0.length - 31744 - 1);
-    buffer1.splice(0, buffer1.length - 31744 - 1);
+    // 最新のセグメントに前後のゼロパディングを付けて切り出し (境界ノイズ対策)
+    const left = new Float32Array(INPUT_SIZE);
+    const right = new Float32Array(INPUT_SIZE);
+    left.set(window0, PAD_SIZE);
+    right.set(window1, PAD_SIZE);
 
     let inputL = tf.tensor1d(left);
     let inputR = tf.tensor1d(right);
@@ -86,32 +112,34 @@ async function runModel() {
     let t0 = tf.stack([l, r], 0); // [ch, re/im, F, T]
     let reshaped2 = t0.reshape([1, 4, t0.shape[2], t0.shape[3]]);
 
-    if (!window.model) {
-        tf.engine().endScope();
-        return;
-    }
-
     // AI推論実行
     let prediction = model.predict(reshaped2);
 
     // --- 後処理: AIの出力と元音の高域を結合してISTFT ---
     let signals = await istft(prediction, highFreqL, highFreqR);
 
-    // 出力バッファへ書き込み
-    let elapse = currentLast - writtenPointer;
-    let outdata0 = Array.from(signals[0]).slice(padSize, padSize + 31744);
-    let outdata1 = Array.from(signals[1]).slice(padSize, padSize + 31744);
+    // 出力のうち、前回以降に到着した分だけを末尾から切り出す
+    // (TypedArrayのsliceはコピーを返すのでpostMessageしても安全)
+    const out0 = signals[0].slice(PAD_SIZE + SEGMENT_SIZE - take, PAD_SIZE + SEGMENT_SIZE);
+    const out1 = signals[1].slice(PAD_SIZE + SEGMENT_SIZE - take, PAD_SIZE + SEGMENT_SIZE);
 
-    if (elapse < outdata0.length) {
-        writeBuffer0 = writeBuffer0.concat(outdata0.slice(outdata0.length - elapse));
-        writeBuffer1 = writeBuffer1.concat(outdata1.slice(outdata1.length - elapse));
-    } else {
-        writeBuffer0 = writeBuffer0.concat(outdata0);
-        writeBuffer1 = writeBuffer1.concat(outdata1);
+    // 伴奏(モデル出力)とボーカル(= 元音 - 伴奏)をそれぞれの割合でミックスする
+    // 元音は推論開始時のスナップショット (left/right) から同じ位置を参照する
+    const vR = vocalRatio / 100;
+    const iR = instRatio / 100;
+    if (vR != 0 || iR != 1) {
+        const offset = PAD_SIZE + SEGMENT_SIZE - take;
+        for (let i = 0; i < take; i++) {
+            const inst0 = out0[i];
+            const inst1 = out1[i];
+            out0[i] = iR * inst0 + vR * (left[offset + i] - inst0);
+            out1[i] = iR * inst1 + vR * (right[offset + i] - inst1);
+        }
     }
 
     writtenPointer = currentLast;
     tf.engine().endScope();
+    return [out0, out1];
 }
 
 /**
@@ -241,4 +269,15 @@ async function getIstftLR_Normalized(spectrogramL, spectrogramR, fftSize, hopSiz
 
 function createHannWindow(length) {
     return tf.tidy(() => tf.signal.hannWindow(length));
+}
+
+/**
+ * バッファ全体が無音かどうかの判定
+ */
+function isSilent(arr) {
+    for (let i = 0; i < arr.length; i++) {
+        const v = arr[i];
+        if (v > SILENCE_THRESHOLD || v < -SILENCE_THRESHOLD) return false;
+    }
+    return true;
 }
