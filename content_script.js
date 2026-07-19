@@ -1,8 +1,9 @@
 ﻿let bufferL = [];
 let bufferR = [];
 
-let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-audioContext.sampleRate = 44100;
+// モデルは44.1kHz学習なので、コンテキスト生成時にサンプルレートを指定する
+// (sampleRateプロパティへの代入は読み取り専用のため無効)
+let audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
 
 let bufferQueue = [];
 let stopped = false;

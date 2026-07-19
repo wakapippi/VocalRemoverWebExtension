@@ -82,9 +82,9 @@ async function runModel() {
     const { low: r, high: highFreqR } = getStftParts(inputR);
 
     // AIモデルへの入力成形 [1, 4, 3072, 32]
-    let t0 = tf.stack([l, r], 3);
-    let t1 = t0.transpose([0, 3, 1, 2]);
-    let reshaped2 = t1.reshape([1, 4, -1, t1.shape[t1.shape.length - 1]]);
+    // UVRのSTFTと同じチャンネル優先の並び [L_re, L_im, R_re, R_im] に詰める
+    let t0 = tf.stack([l, r], 0); // [ch, re/im, F, T]
+    let reshaped2 = t0.reshape([1, 4, t0.shape[2], t0.shape[3]]);
 
     if (!window.model) {
         tf.engine().endScope();
