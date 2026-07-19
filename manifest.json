@@ -1,7 +1,7 @@
 {
   "name": "Wakapippi Vocal Remover Extension",
-  "description": "A realtime vocal remover using ML models.",
-  "version": "0.2",
+  "description": "AIが再生中のWeb動画からリアルタイムでボーカルを除去。ボーカルと伴奏のミックスも自由自在。すべてブラウザ内で処理されます。",
+  "version": "1.0",
   "manifest_version": 3,
   "content_scripts": [
     {
