@@ -13,8 +13,13 @@ chrome.runtime.onMessage.addListener((mes, _sender, sendResponse) => {
         if (workletNode) workletNode.port.postMessage({ type: "set_stop", value: true });
         sendResponse();
     } else if (mes.type == "start") {
-        stopped = false;
         let video = document.querySelector("video");
+        if (video == null) {
+            // 動画がないページでは開始しない (popup側でエラー表示される)
+            sendResponse("novideo");
+            return;
+        }
+        stopped = false;
         startHookVideo(video);
 
         if (workletNode) workletNode.port.postMessage({ type: "set_stop", value: false });

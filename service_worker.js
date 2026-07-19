@@ -40,9 +40,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
         currentTab = -1;
         chrome.storage.session.remove('currentTab');
+    } else if (message.type == "getStatus") {
+        // popupが開いたときの状態表示用
+        restored.then(() => {
+            if (currentTab == -1) {
+                sendResponse({ running: false });
+                return;
+            }
+            // 対象タブが既に閉じられていたら停止扱いにして状態を掃除する
+            chrome.tabs.get(currentTab, (tab) => {
+                if (chrome.runtime.lastError || !tab) {
+                    currentTab = -1;
+                    chrome.storage.session.remove('currentTab');
+                    sendResponse({ running: false });
+                } else {
+                    sendResponse({ running: true });
+                }
+            });
+        });
+        return true; // 非同期でsendResponseを呼ぶ
     } else if (message.type == "getMixRatio") {
         // offscreenはchrome.storageを使えないため、代わりに読み出して返す
-        chrome.storage.local.get({ vocalRatio: 0, instRatio: 100 }, (v) => sendResponse({ vocal: v.vocalRatio, inst: v.instRatio }));
+        chrome.storage.local.get({ vocalRatio: 0, instRatio: 100, denoise: true }, (v) => sendResponse({ vocal: v.vocalRatio, inst: v.instRatio, denoise: v.denoise }));
         return true; // 非同期でsendResponseを呼ぶ
     }
 });

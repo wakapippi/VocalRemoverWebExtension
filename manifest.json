@@ -11,16 +11,17 @@
       ],
       "js": [
         "content_script.js"
-      ],
-      "resources": [
-        "models/*",
-        "sandbox.html"
       ]
     }
   ],
   "permissions": [
     "offscreen",
-    "storage"
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "content_security_policy": {
     "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval';"

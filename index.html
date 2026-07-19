@@ -1,31 +1,277 @@
 <!DOCTYPE html>
 <html>
-<style>
-    body {
-        width: 400px;
-    }
-</style>
 
 <head>
     <meta charset="UTF-8">
+    <style>
+        :root {
+            --bg: #14161f;
+            --card: #1e212d;
+            --text: #e8eaf2;
+            --muted: #9aa0b4;
+            --border: #2b2f40;
+            --accent: #7c5cff;
+            --accent2: #4f8cff;
+            --green: #34d399;
+            --red: #f87171;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            width: 300px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+            padding: 16px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: .03em;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--muted);
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .status .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #555b6e;
+        }
+
+        body.running .status {
+            color: var(--green);
+            border-color: rgba(52, 211, 153, .35);
+        }
+
+        body.running .status .dot {
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            50% {
+                opacity: .35;
+            }
+        }
+
+        #toggle {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            font-family: inherit;
+            color: #fff;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            transition: filter .15s, transform .05s;
+        }
+
+        #toggle:hover {
+            filter: brightness(1.12);
+        }
+
+        #toggle:active {
+            transform: scale(.98);
+        }
+
+        body.running #toggle {
+            background: var(--card);
+            border: 1px solid rgba(248, 113, 113, .4);
+            color: var(--red);
+        }
+
+        .mixer {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px;
+            margin-top: 14px;
+        }
+
+        .mixer-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .slider-row+.slider-row {
+            margin-top: 14px;
+        }
+
+        .slider-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .slider-head .val {
+            color: var(--text);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+            background: linear-gradient(to right, var(--accent) 0%, var(--accent2) var(--p, 0%), #343a4d var(--p, 0%));
+            cursor: pointer;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+            cursor: pointer;
+            transition: transform .1s;
+        }
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        .option-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .option-row label {
+            font-size: 12px;
+        }
+
+        .option-desc {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .switch input {
+            display: none;
+        }
+
+        .switch .track {
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+            background: #343a4d;
+            border-radius: 999px;
+            position: relative;
+            transition: background .15s;
+            cursor: pointer;
+        }
+
+        .switch .track .knob {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            transition: left .15s;
+        }
+
+        .switch input:checked+.track {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+        }
+
+        .switch input:checked+.track .knob {
+            left: 18px;
+        }
+
+        .footer {
+            margin-top: 12px;
+            font-size: 10.5px;
+            line-height: 1.5;
+            color: var(--muted);
+        }
+
+        .footer.error {
+            color: var(--red);
+        }
+    </style>
 </head>
 
 <body>
-    <div>
-        Web動画が含まれているタブで実行ボタンをクリックすると、そのタブで再生している動画のボーカル音声を消すことができます。
-        <br>
-        正常に動作しない場合は、GPUの性能が不足している可能性があります。
-    </div><br>
-    <input type="button" id="execute" value="実行"></input>
-    <input type="button" id="stop" value="停止"></input>
-    <div style="margin-top: 12px;">
-        <label for="vocal-ratio">ボーカル音量: <span id="vocal-ratio-value">0</span>%</label><br>
-        <input type="range" id="vocal-ratio" min="0" max="100" step="1" value="0" style="width: 100%;">
+    <div class="header">
+        <div class="title">Vocal Remover</div>
+        <div class="status"><span class="dot"></span><span id="status-text">停止中</span></div>
     </div>
-    <div style="margin-top: 8px;">
-        <label for="inst-ratio">伴奏音量: <span id="inst-ratio-value">100</span>%</label><br>
-        <input type="range" id="inst-ratio" min="0" max="100" step="1" value="100" style="width: 100%;">
+
+    <button id="toggle">▶&nbsp; 実行</button>
+
+    <div class="mixer">
+        <div class="mixer-title">MIX</div>
+        <div class="slider-row">
+            <div class="slider-head">
+                <label for="vocal-ratio">ボーカル</label>
+                <span class="val"><span id="vocal-ratio-value">0</span>%</span>
+            </div>
+            <input type="range" id="vocal-ratio" min="0" max="100" step="1" value="0">
+        </div>
+        <div class="slider-row">
+            <div class="slider-head">
+                <label for="inst-ratio">伴奏</label>
+                <span class="val"><span id="inst-ratio-value">100</span>%</span>
+            </div>
+            <input type="range" id="inst-ratio" min="0" max="100" step="1" value="100">
+        </div>
+        <div class="option-row">
+            <div>
+                <label for="denoise">ノイズ除去</label>
+                <div class="option-desc">GPU負荷が約2倍になります</div>
+            </div>
+            <label class="switch">
+                <input type="checkbox" id="denoise" checked>
+                <span class="track"><span class="knob"></span></span>
+            </label>
+        </div>
     </div>
+
+    <div class="footer" id="message">動画のあるタブで実行してください。GPU性能が低い場合は正常に動作しないことがあります。</div>
+
     <script src="index.js"></script>
 </body>
 
