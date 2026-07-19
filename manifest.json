@@ -24,7 +24,7 @@
     "https://*/*"
   ],
   "content_security_policy": {
-    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval';"
+    "sandbox": "sandbox allow-scripts; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval';"
   },
   "sandbox": {
     "pages": [

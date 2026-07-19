@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>sandbox E2E test</title>
+</head>
+
+<body>
+    <pre id="log">running...</pre>
+    <!-- 本物のsandboxページをoffscreenと同じ方法で駆動する -->
+    <iframe id="sandbox" src="/sandbox.html"></iframe>
+    <script>
+        const logEl = document.getElementById("log");
+        const lines = [];
+        function log(s) { lines.push(s); logEl.textContent = lines.join("\n"); console.log(s); }
+
+        const SR = 44100;
+        const CHUNK = 2048;
+        const TOTAL_SECONDS = 5;
+        const TOTAL_SAMPLES = SR * TOTAL_SECONDS;
+
+        let received = 0;
+        let nonFinite = 0;
+        let sumAbs = 0;
+        let firstOutputAt = null;
+        const t0 = performance.now();
+
+        window.addEventListener("message", (event) => {
+            // sandboxからの処理済み音声
+            const [l, r] = event.data;
+            if (firstOutputAt == null) firstOutputAt = performance.now() - t0;
+            received += l.length;
+            for (let i = 0; i < l.length; i += 97) {
+                const v = l[i];
+                if (!Number.isFinite(v)) nonFinite++;
+                sumAbs += Math.abs(v);
+            }
+        });
+
+        // 音楽っぽい信号: 複数正弦波 + ノイズ (L/Rで少し変える)
+        function makeChunk(offset) {
+            const l = new Float32Array(CHUNK);
+            const r = new Float32Array(CHUNK);
+            for (let i = 0; i < CHUNK; i++) {
+                const t = (offset + i) / SR;
+                const v = 0.25 * Math.sin(2 * Math.PI * 220 * t)
+                    + 0.15 * Math.sin(2 * Math.PI * 440 * t)
+                    + 0.1 * Math.sin(2 * Math.PI * 3000 * t)
+                    + 0.02 * (Math.random() - 0.5);
+                l[i] = v;
+                r[i] = v * 0.9 + 0.03 * Math.sin(2 * Math.PI * 330 * t);
+            }
+            return [l, r];
+        }
+
+        (async function main() {
+            const iframe = document.getElementById("sandbox");
+            await new Promise((s) => iframe.addEventListener("load", s));
+            const target = iframe.contentWindow;
+
+            // モデル初期化を待つ猶予を見つつ、実時間の約4倍速で流し込む
+            let offset = 0;
+            const feedTimer = setInterval(() => {
+                for (let k = 0; k < 4 && offset < TOTAL_SAMPLES; k++) {
+                    const [l, r] = makeChunk(offset);
+                    target.postMessage({ type: "buffer", payload: [l, r], mixRatio: { vocal: 30, inst: 100 }, denoise: true }, "*");
+                    offset += CHUNK;
+                }
+                if (offset >= TOTAL_SAMPLES) clearInterval(feedTimer);
+            }, CHUNK / SR * 1000); // 実時間の4倍速
+
+            // 送信完了後、出力が出きるまで待つ
+            const deadline = performance.now() + 120000;
+            while (performance.now() < deadline) {
+                await new Promise((s) => setTimeout(s, 500));
+                if (offset >= TOTAL_SAMPLES && received > TOTAL_SAMPLES * 0.5) {
+                    // 出力の増加が止まったら終了
+                    const before = received;
+                    await new Promise((s) => setTimeout(s, 2000));
+                    if (received == before) break;
+                }
+            }
+
+            const wall = (performance.now() - t0) / 1000;
+            const result = {
+                ok: received > 0 && nonFinite == 0 && sumAbs > 0,
+                fed_samples: offset,
+                received_samples: received,
+                first_output_ms: firstOutputAt == null ? null : +firstOutputAt.toFixed(0),
+                non_finite: nonFinite,
+                mean_abs_sampled: +(sumAbs / Math.max(1, Math.ceil(received / 97))).toFixed(4),
+                wall_seconds: +wall.toFixed(1),
+            };
+            log(JSON.stringify(result, null, 2));
+            window.__e2eResult = result;
+            window.__e2eDone = true;
+        })();
+    </script>
+</body>
+
+</html>

@@ -1,3 +1,8 @@
+// 推論バックエンド: LiteRT.js (WebGPU)。STFT/ISTFTはTF.jsのまま、
+// テンソルはtfjs-interop経由でGPU上のまま受け渡す。
+import { loadLiteRt, loadAndCompile, getWebGpuDevice } from "./litert/core.js";
+import { runWithTfjsTensors } from "./litert/tfjs-interop.js";
+
 const SEGMENT_SIZE = 31744;   // AI処理に必要なサンプル数 (32フレーム分)
 const PAD_SIZE = 3072;        // 境界ノイズ対策の前後ゼロパディング
 const INPUT_SIZE = SEGMENT_SIZE + PAD_SIZE * 2;
@@ -64,8 +69,16 @@ function appendToWindow(chunk0, chunk1) {
 (async function () {
 
     await waitMs(50);
+
+    // LiteRTを先に初期化してWebGPUデバイスを作らせ、TF.jsのWebGPUバックエンドを
+    // 同じデバイスで登録し直す (GPU上のままテンソルを受け渡すための前提条件)
+    await loadLiteRt("./litert/wasm/");
+    const device = await getWebGpuDevice();
+    tf.removeBackend('webgpu');
+    tf.registerBackend('webgpu', () => new tf.WebGPUBackend(device, device.adapterInfo));
     await tf.setBackend('webgpu');
-    window.model = await tf.loadGraphModel("./models/model.json");
+
+    window.model = await loadAndCompile("./models/vr_model.tflite", { accelerator: "webgpu" });
 
     while (true) {
         const result = await runModel();
@@ -135,24 +148,17 @@ async function runModel() {
     let zeroHead = tf.zeros([1, 4, 3, reshaped2.shape[3]]);
     let spek = tf.concat([zeroHead, reshaped2.slice([0, 0, 3, 0], [-1, -1, -1, -1])], 2);
 
-    // AI推論実行
+    // AI推論実行 (LiteRT.js WebGPU。入出力はtfjs-interopでGPU上のまま受け渡す)
     let prediction;
     if (denoiseEnabled) {
         // MDXモデルのノイズフロア対策: 極性反転した入力との平均でノイズを相殺する
         // (UVRのis_denoise: -model(-spek)*0.5 + model(spek)*0.5 と等価)
-        try {
-            // バッチ2で1回の推論にまとめる
-            let batched = model.predict(tf.concat([spek, spek.neg()], 0));
-            let parts = tf.split(batched, 2, 0);
-            prediction = parts[0].sub(parts[1]).mul(0.5);
-        } catch (e) {
-            // 変換済みモデルがバッチ実行に対応していない場合は2回に分けて実行
-            let predP = model.predict(spek);
-            let predN = model.predict(spek.neg());
-            prediction = predP.sub(predN).mul(0.5);
-        }
+        // tfliteはWebGPUデリゲートの制約でバッチ1固定のため2回実行する
+        let predP = (await runWithTfjsTensors(model, [spek]))[0];
+        let predN = (await runWithTfjsTensors(model, [spek.neg()]))[0];
+        prediction = predP.sub(predN).mul(0.5);
     } else {
-        prediction = model.predict(spek);
+        prediction = (await runWithTfjsTensors(model, [spek]))[0];
     }
 
     // UVRのcompensate補正 (伴奏出力のゲイン補正。ボーカル導出の精度にも効く)
