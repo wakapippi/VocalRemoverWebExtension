@@ -115,9 +115,12 @@ instSlider.addEventListener("input", onRatioChange);
 
 
 // ノイズ除去トグル (MDXモデルのノイズフロア対策。推論が2倍になるためGPU負荷増)
+// FirefoxはWebGPU性能がChromeの約3倍遅くdenoise ONだとリアルタイム処理が
+// 厳しいため、デフォルトOFFにする (browserグローバルの有無でFirefoxを判定)
+const DENOISE_DEFAULT = typeof browser === "undefined"; // Chrome: true / Firefox: false
 const denoiseToggle = document.querySelector("#denoise");
 
-chrome.storage.local.get({ denoise: true }, (v) => {
+chrome.storage.local.get({ denoise: DENOISE_DEFAULT }, (v) => {
     denoiseToggle.checked = v.denoise;
 });
 

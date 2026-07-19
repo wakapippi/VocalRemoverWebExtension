@@ -8,11 +8,12 @@ const sandboxFrame = document.getElementById("sandbox");
 let currentTab = -1;
 let vocalRatio = 0;
 let instRatio = 100;
-let denoiseEnabled = true;
+// FirefoxはWebGPU性能の都合でdenoiseデフォルトOFF (popupのDENOISE_DEFAULTと合わせる)
+let denoiseEnabled = false;
 
 // 設定の復元 (バックグラウンド頁はchrome.storageに直接アクセスできるため、
 // Chrome版のようなservice worker経由の問い合わせは不要)
-chrome.storage.local.get({ vocalRatio: 0, instRatio: 100, denoise: true }, (v) => {
+chrome.storage.local.get({ vocalRatio: 0, instRatio: 100, denoise: false }, (v) => {
     vocalRatio = v.vocalRatio;
     instRatio = v.instRatio;
     denoiseEnabled = v.denoise;
