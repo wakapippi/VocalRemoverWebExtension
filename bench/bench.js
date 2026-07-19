@@ -113,6 +113,16 @@ function maxAbsDiff(a, b) {
         log("  -> " + JSON.stringify(results.tfjs_webgpu_b2));
 
         // --- LiteRT.js ---
+        // Safari対応: GPUDevice.adapterInfo 未実装環境向けポリフィル
+        // (LiteRTのEmscriptenバインディングが device.adapterInfo を参照して落ちる)
+        if (typeof GPUDevice !== "undefined" && !("adapterInfo" in GPUDevice.prototype)) {
+            log("polyfilling GPUDevice.adapterInfo (Safari)");
+            const info = {
+                vendor: "apple", architecture: "", device: "", description: "",
+                subgroupMinSize: 32, subgroupMaxSize: 32,
+            };
+            Object.defineProperty(GPUDevice.prototype, "adapterInfo", { get: () => info });
+        }
         log("LiteRT: loading wasm runtime...");
         await loadLiteRt("./node_modules/@litertjs/core/wasm/");
 
