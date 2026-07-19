@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>VocalRemover Backend Benchmark</title>
+    <style>
+        body {
+            font-family: -apple-system, monospace;
+            background: #14161f;
+            color: #e8eaf2;
+            padding: 24px;
+        }
+
+        pre {
+            background: #1e212d;
+            padding: 16px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>TF.js (WebGPU) vs LiteRT.js ベンチマーク</h2>
+    <pre id="log">loading...</pre>
+
+    <!-- 拡張機能本体と同じTF.jsランタイムを使う -->
+    <script src="../tf.min.js"></script>
+    <script src="../tf-backend-webgpu.js"></script>
+    <!-- LiteRT.jsのベア指定子importの解決 -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@litertjs/wasm-utils": "./node_modules/@litertjs/wasm-utils/dist/index.js"
+        }
+    }
+    </script>
+    <script>
+        // モジュール読み込み自体の失敗も検知できるようにする
+        window.addEventListener("error", (e) => {
+            if (!window.__benchDone) {
+                window.__benchResult = { ok: false, error: String(e.message || e.error) };
+                window.__benchDone = true;
+            }
+        });
+    </script>
+    <script type="module" src="bench.js"></script>
+</body>
+
+</html>
