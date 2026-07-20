@@ -133,7 +133,7 @@ denoiseToggle.addEventListener("change", () => {
 // 映像同期トグル (content scriptがstorage.onChangedで直接拾うのでメッセージ不要)
 const videoSyncToggle = document.querySelector("#video-sync");
 
-chrome.storage.local.get({ videoSync: true }, (v) => {
+chrome.storage.local.get({ videoSync: false }, (v) => {
     videoSyncToggle.checked = v.videoSync;
 });
 

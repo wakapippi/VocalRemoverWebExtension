@@ -7,9 +7,9 @@ let source = null;
 let lastVideo = null;
 let workletNode;
 let videoMirror = null;
-let videoSyncEnabled = true; // 映像を音声処理の遅延分だけ遅らせてリップシンクを合わせる
+let videoSyncEnabled = false; // 映像を音声処理の遅延分だけ遅らせてリップシンクを合わせる (デフォルトOFF)
 
-chrome.storage.local.get({ videoSync: true }, (v) => {
+chrome.storage.local.get({ videoSync: false }, (v) => {
     videoSyncEnabled = v.videoSync;
 });
 chrome.storage.onChanged.addListener((changes) => {
