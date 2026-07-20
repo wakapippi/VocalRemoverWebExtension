@@ -34,8 +34,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 window.addEventListener("message", (event) => {
     // sandboxからの処理済み音声(Float32Array)を、拡張機能メッセージで送れる形に
     // 通常配列へ変換してservice worker経由でタブへ返す
+    // (payload[2]は入力タイムライン位置。workletの遅延実測に使う)
     chrome.runtime.sendMessage({
         type: "outputBuffer",
-        payload: [Array.from(event.data[0]), Array.from(event.data[1])]
+        payload: [Array.from(event.data[0]), Array.from(event.data[1]), event.data[2]]
     });
 });

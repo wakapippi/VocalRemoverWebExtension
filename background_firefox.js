@@ -32,7 +32,7 @@ window.addEventListener("message", (event) => {
     if (currentTab == -1) return;
     chrome.tabs.sendMessage(currentTab, {
         type: "buffer",
-        payload: [Array.from(event.data[0]), Array.from(event.data[1])]
+        payload: [Array.from(event.data[0]), Array.from(event.data[1]), event.data[2]]
     }, () => chrome.runtime.lastError);
 });
 

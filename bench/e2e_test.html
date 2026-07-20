@@ -24,11 +24,13 @@
         let nonFinite = 0;
         let sumAbs = 0;
         let firstOutputAt = null;
+        let lastTimelineEnd = null; // 遅延実測用のタイムライン位置が流れているか
         const t0 = performance.now();
 
         window.addEventListener("message", (event) => {
             // sandboxからの処理済み音声
-            const [l, r] = event.data;
+            const [l, r, timelineEnd] = event.data;
+            if (typeof timelineEnd === "number") lastTimelineEnd = timelineEnd;
             if (firstOutputAt == null) firstOutputAt = performance.now() - t0;
             received += l.length;
             for (let i = 0; i < l.length; i += 97) {
@@ -84,7 +86,8 @@
 
             const wall = (performance.now() - t0) / 1000;
             const result = {
-                ok: received > 0 && nonFinite == 0 && sumAbs > 0,
+                ok: received > 0 && nonFinite == 0 && sumAbs > 0 && lastTimelineEnd != null,
+                last_timeline_end: lastTimelineEnd,
                 fed_samples: offset,
                 received_samples: received,
                 first_output_ms: firstOutputAt == null ? null : +firstOutputAt.toFixed(0),

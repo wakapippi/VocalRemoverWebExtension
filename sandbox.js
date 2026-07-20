@@ -111,17 +111,21 @@ async function runModel() {
     // クロスフェードのために前回分の末尾も含めて出力を作る
     const needed = Math.min(take + XFADE_SIZE, SEGMENT_SIZE);
 
+    // 出力の末尾が対応する入力タイムライン位置 (クロスフェード保持分を差し引く)。
+    // workletが実際の音声遅延を測るために出力へ添付する
+    const timelineEnd = currentLast - XFADE_SIZE;
+
     // 完全ミュート設定、または無音区間 (一時停止中など) は推論をスキップして
     // GPU負荷を抑え、無音をそのまま返す
     if ((vocalRatio == 0 && instRatio == 0) || (isSilent(window0) && isSilent(window1))) {
         writtenPointer = currentLast;
-        return emitWithCrossfade(new Float32Array(take + XFADE_SIZE), new Float32Array(take + XFADE_SIZE), take);
+        return [...emitWithCrossfade(new Float32Array(take + XFADE_SIZE), new Float32Array(take + XFADE_SIZE), take), timelineEnd];
     }
 
     // 両方100% (= 元音のまま) も推論不要
     if (vocalRatio == 100 && instRatio == 100) {
         writtenPointer = currentLast;
-        return emitWithCrossfade(window0.slice(SEGMENT_SIZE - needed), window1.slice(SEGMENT_SIZE - needed), take);
+        return [...emitWithCrossfade(window0.slice(SEGMENT_SIZE - needed), window1.slice(SEGMENT_SIZE - needed), take), timelineEnd];
     }
 
     tf.engine().startScope();
@@ -183,7 +187,7 @@ async function runModel() {
 
     writtenPointer = currentLast;
     tf.engine().endScope();
-    return emitWithCrossfade(mixed0, mixed1, take);
+    return [...emitWithCrossfade(mixed0, mixed1, take), timelineEnd];
 }
 
 /**

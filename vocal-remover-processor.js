@@ -1,5 +1,6 @@
 const INPUT_BATCH_SIZE = 2048;   // 入力をまとめて送るサンプル数 (約46ms @ 44.1kHz)
 const MAX_QUEUE_SIZE = 44100;    // 処理済みバッファの上限 (約1秒)
+const LATENCY_REPORT_INTERVAL = 32; // 遅延報告の間隔 (processフレーム数、約93ms)
 
 class VocalRemoverProcessor extends AudioWorkletProcessor {
     constructor() {
@@ -12,9 +13,14 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
         this.batchFill = 0;
 
         // 処理済み音声のチャンクキュー (spread/spliceによる全体コピーを避ける)
+        // 各チャンク: { l, r, end } (endは入力タイムライン上の末尾サンプル位置)
         this.chunks = [];
         this.chunkOffset = 0; // 先頭チャンクの読み出し位置
         this.queued = 0;      // キュー内の残りサンプル数
+
+        // 遅延実測用: 送信済み入力サンプル数 (sandbox側のタイムラインと同じ座標系)
+        this.sentTotal = 0;
+        this.frameCount = 0;
 
         // アンダーフロー時のフェード制御用
         this.everProcessed = false; // 処理済み音声を一度でも出力したか
@@ -24,16 +30,21 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
 
         this.port.onmessage = (event) => {
             if (event.data.type === "processed_buffer") {
-                this.chunks.push(event.data.payload);
+                this.chunks.push({
+                    l: event.data.payload[0],
+                    r: event.data.payload[1],
+                    end: event.data.timelineEnd,
+                });
                 this.queued += event.data.payload[0].length;
                 this.trimQueue();
             } else if (event.data.type === "set_stop") {
                 this.stopped = event.data.value;
                 if (!this.stopped) {
-                    // 再開時は古い処理済み音声を破棄
+                    // 再開時は古い処理済み音声を破棄 (sandbox側もリロードで0から始まる)
                     this.chunks = [];
                     this.chunkOffset = 0;
                     this.queued = 0;
+                    this.sentTotal = 0;
                     this.everProcessed = false;
                     this.wasUnderflow = true;
                 }
@@ -45,15 +56,24 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
     trimQueue() {
         while (this.queued > MAX_QUEUE_SIZE && this.chunks.length > 0) {
             const first = this.chunks[0];
-            const available = first[0].length - this.chunkOffset;
+            const available = first.l.length - this.chunkOffset;
             const drop = Math.min(available, this.queued - MAX_QUEUE_SIZE);
             this.chunkOffset += drop;
             this.queued -= drop;
-            if (this.chunkOffset >= first[0].length) {
+            if (this.chunkOffset >= first.l.length) {
                 this.chunks.shift();
                 this.chunkOffset = 0;
             }
         }
+    }
+
+    // 現在流している音声の遅延 (秒) をメインスレッドへ定期報告する。
+    // 映像側をこの分だけ遅らせてリップシンクを合わせるために使う。
+    reportLatency(seconds) {
+        if ((this.frameCount++ % LATENCY_REPORT_INTERVAL) != 0) return;
+        // タブ切替直後などでタイムラインが食い違った場合の異常値は0扱いにする
+        if (!(seconds >= 0 && seconds < 3)) seconds = 0;
+        this.port.postMessage({ type: "latency", value: seconds });
     }
 
     process(inputs, outputs, parameters) {
@@ -76,6 +96,7 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
             this.batchL = new Float32Array(INPUT_BATCH_SIZE);
             this.batchR = new Float32Array(INPUT_BATCH_SIZE);
             this.batchFill = 0;
+            this.sentTotal += INPUT_BATCH_SIZE;
         }
 
         // 2. 出力バッファへの書き込み
@@ -87,17 +108,25 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
                 output[channel].set(input[channel] || input[0]);
             }
             this.wasUnderflow = true;
+            this.reportLatency(0);
             return true;
         }
 
         if (this.queued >= frameSize) {
+            // 再生位置の入力タイムライン座標から実遅延を計算
+            const first = this.chunks[0];
+            if (first.end != null) {
+                const pos = first.end - (first.l.length - this.chunkOffset);
+                this.reportLatency((this.sentTotal - pos) / sampleRate);
+            }
+
             // 処理済みバッファから取り出してセット
             for (let i = 0; i < frameSize; i++) {
-                const first = this.chunks[0];
-                output[0][i] = first[0][this.chunkOffset];
-                if (output[1]) output[1][i] = first[1][this.chunkOffset];
+                const chunk = this.chunks[0];
+                output[0][i] = chunk.l[this.chunkOffset];
+                if (output[1]) output[1][i] = chunk.r[this.chunkOffset];
                 this.chunkOffset++;
-                if (this.chunkOffset >= first[0].length) {
+                if (this.chunkOffset >= chunk.l.length) {
                     this.chunks.shift();
                     this.chunkOffset = 0;
                 }
@@ -121,6 +150,7 @@ class VocalRemoverProcessor extends AudioWorkletProcessor {
             for (let channel = 0; channel < output.length; channel++) {
                 output[channel].set(input[channel] || input[0]);
             }
+            this.reportLatency(0);
         } else if (!this.wasUnderflow) {
             // 処理開始後のバッファ不足時は元音 (ボーカル入り) を流さず、
             // 最後のサンプル値からフェードアウトした無音にする

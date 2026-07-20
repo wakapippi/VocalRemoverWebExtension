@@ -128,3 +128,15 @@ denoiseToggle.addEventListener("change", () => {
     chrome.storage.local.set({ denoise: denoiseToggle.checked });
     chrome.runtime.sendMessage({ type: "denoise", payload: denoiseToggle.checked });
 });
+
+
+// 映像同期トグル (content scriptがstorage.onChangedで直接拾うのでメッセージ不要)
+const videoSyncToggle = document.querySelector("#video-sync");
+
+chrome.storage.local.get({ videoSync: true }, (v) => {
+    videoSyncToggle.checked = v.videoSync;
+});
+
+videoSyncToggle.addEventListener("change", () => {
+    chrome.storage.local.set({ videoSync: videoSyncToggle.checked });
+});
