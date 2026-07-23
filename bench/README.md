@@ -61,6 +61,20 @@ node run_bench.mjs        # ヘッドレスChromeで自動実行
 ブラウザで見たい場合は、リポジトリルートで `python3 -m http.server` などを立てて
 `http://localhost:8000/bench/bench.html` を開く (WebGPUが必要)。
 
+## 4ステム分離 PoC (stems.html)
+
+kuielab_b per-stem MDXモデル4つ (Vocals/Drums/Bass/Other) をonnx2tfでTFLite化して
+LiteRT.js WebGPUで動かすPoC。変換手順は `convert_stems.py` のコメント参照。
+
+- 変換: 4モデルともONNX↔TFLiteパリティ < 1e-4 で成功 (時間次元は256→32フレームに短縮可能だった)
+- onnx2tf はNCHW→NHWCにレイアウト変換するため、tfliteの入出力は `[1,2048,32,4]`
+- 検証結果 (2026-07-23, Apple Silicon, 合成音源): 全ステム出力正常、帯域傾向OK
+  (bass低域優勢・drumsパルス性最大)
+- 速度 (median/セグメント): vocals 158ms / drums 85ms / **bass 953ms** / other 259ms
+  → 合計1454ms = **実時間の0.49倍でリアルタイム不可** (bassのn_fft 16384が支配的)
+- 試聴: リポジトリルートで `python3 -m http.server` → `http://localhost:8000/bench/stems.html`
+  に音声ファイルをドロップ。自動検証は `node run_stems.mjs`
+
 ## 本実装への組み込みについて
 
 拡張機能本体に組み込む場合の主な作業:

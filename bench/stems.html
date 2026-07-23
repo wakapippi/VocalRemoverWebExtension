@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>4-Stem Separation PoC</title>
+    <style>
+        body {
+            font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif;
+            background: #14161f;
+            color: #e8eaf2;
+            padding: 24px;
+            max-width: 760px;
+            margin: 0 auto;
+        }
+
+        h2 {
+            margin-bottom: 4px;
+        }
+
+        .sub {
+            color: #9aa0b4;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        #drop {
+            border: 2px dashed #3a4055;
+            border-radius: 12px;
+            padding: 36px;
+            text-align: center;
+            color: #9aa0b4;
+            cursor: pointer;
+            transition: border-color .15s, background .15s;
+        }
+
+        #drop.hover {
+            border-color: #7c5cff;
+            background: rgba(124, 92, 255, .08);
+        }
+
+        #status {
+            margin: 16px 0;
+            font-size: 13px;
+            white-space: pre-wrap;
+            color: #b9bfd2;
+        }
+
+        .stem {
+            background: #1e212d;
+            border: 1px solid #2b2f40;
+            border-radius: 10px;
+            padding: 12px 16px;
+            margin-top: 10px;
+        }
+
+        .stem b {
+            display: inline-block;
+            width: 90px;
+        }
+
+        .stem .meta {
+            color: #9aa0b4;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 8px;
+            height: 32px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>4ステム分離 PoC</h2>
+    <div class="sub">kuielab_b per-stem MDX × LiteRT.js WebGPU — 音声ファイルをドロップすると Vocals / Drums / Bass / Other に分離します</div>
+    <div id="drop">ここに音声ファイルをドロップ (クリックで選択)</div>
+    <input type="file" id="file" accept="audio/*" style="display:none">
+    <div id="status">モデル読み込み中...</div>
+    <div id="results"></div>
+
+    <script src="../tf-csp-shim.js"></script>
+    <script src="../tf.min.js"></script>
+    <script src="../tf-backend-webgpu.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "@litertjs/wasm-utils": "./node_modules/@litertjs/wasm-utils/dist/index.js",
+            "@litertjs/core": "./node_modules/@litertjs/core/dist/index.js",
+            "@tensorflow/tfjs-core": "../litert/tfjs-core-shim.js"
+        }
+    }
+    </script>
+    <script type="module" src="stems.js"></script>
+</body>
+
+</html>
